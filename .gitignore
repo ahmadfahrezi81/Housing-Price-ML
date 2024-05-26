@@ -1,0 +1,11 @@
+# Ignore the __pycache__ directory
+__pycache__/
+
+# Ignore the venv directory
+venv/
+
+# Ignore the .csv file
+House Pricing.csv
+
+# Ignore the .sav file
+svr_model.sav
