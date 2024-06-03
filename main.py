@@ -1,127 +1,118 @@
 import streamlit as st
 import joblib
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
-from predict_model import predict
-import numpy as np
 
-# Load the trained model
-model = joblib.load("svr_model.sav")
-
-
-# Function to preprocess input data
-def preprocess_input(
-    area,
-    bedrooms,
-    bathrooms,
-    stories,
-    mainroad,
-    guestroom,
-    basement,
-    hotwaterheating,
-    airconditioning,
-    parking,
-    prefarea,
-    furnishingstatus,
-):
-    # Create a dictionary with input values
-    input_data = {
-        "area": area,
-        "bedrooms": bedrooms,
-        "bathrooms": bathrooms,
-        "stories": stories,
-        "mainroad_yes": 1 if mainroad == "yes" else 0,
-        "guestroom_yes": 1 if guestroom == "yes" else 0,
-        "basement_yes": 1 if basement == "yes" else 0,
-        "hotwaterheating_yes": 1 if hotwaterheating == "yes" else 0,
-        "airconditioning_yes": 1 if airconditioning == "yes" else 0,
-        "parking": parking,
-        "prefarea_yes": 1 if prefarea == "yes" else 0,
-    }
-
-    # Handle furnishing status
-    if furnishingstatus == "furnished":
-        input_data["furnishingstatus_furnished"] = 1
-        input_data["furnishingstatus_semi-furnished"] = 0
-        input_data["furnishingstatus_unfurnished"] = 0
-    elif furnishingstatus == "semi-furnished":
-        input_data["furnishingstatus_furnished"] = 0
-        input_data["furnishingstatus_semi-furnished"] = 1
-        input_data["furnishingstatus_unfurnished"] = 0
-    else:
-        input_data["furnishingstatus_furnished"] = 0
-        input_data["furnishingstatus_semi-furnished"] = 0
-        input_data["furnishingstatus_unfurnished"] = 1
-
-    # Convert the dictionary to a DataFrame
-    input_df = pd.DataFrame([input_data])
-
-    return input_df
-
-
-# Main Streamlit UI
-st.title("Home Price Prediction")
-st.write("---")
-
-# Get input from the user
-area = st.number_input("Area of the house (in sq ft)", min_value=0, step=1)
-bedrooms = st.number_input("No. of bedrooms", min_value=0, step=1)
-bathrooms = st.number_input("No. of bathrooms", min_value=0, step=1)
-stories = st.number_input("No. of stories", min_value=0, step=1)
-mainroad = st.radio("Main road access", ("yes", "no"))
-guestroom = st.radio("Guest room availability", ("yes", "no"))
-basement = st.radio("Basement availability", ("yes", "no"))
-hotwaterheating = st.radio("Hot water heating", ("yes", "no"))
-airconditioning = st.radio("Air conditioning", ("yes", "no"))
-parking = st.number_input("No. of parking spaces", min_value=0, step=1)
-prefarea = st.radio("Preferred area", ("yes", "no"))
-furnishingstatus = st.radio(
-    "Furnishing status", ("furnished", "semi-furnished", "unfurnished")
+# Set the page configuration
+st.set_page_config(
+    page_title="House Price Predictor", page_icon="🏠", layout="centered"
 )
 
-# Predict button
-if st.button("Predict Now"):
-    cost = predict(
-        np.array(
-            [
-                [
-                    area,
-                    bedrooms,
-                    bathrooms,
-                    stories,
-                    mainroad,
-                    guestroom,
-                    basement,
-                    hotwaterheating,
-                    airconditioning,
-                    parking,
-                    prefarea,
-                    furnishingstatus,
-                ]
-            ]
+# Load the trained model and scaler
+loaded_objects = joblib.load("house_price_model.sav")
+loaded_model = loaded_objects["model"]
+scaler = loaded_objects["scaler"]
+
+
+def main():
+    st.title("House Price Prediction App")
+
+    with st.sidebar:
+        st.header("Configuration")
+
+        # Input fields for user to enter house features
+        bedrooms = st.slider("Number of Bedrooms", min_value=1, max_value=6, value=3)
+        bathrooms = st.slider("Number of Bathrooms", min_value=1, max_value=5, value=1)
+        floors = st.slider("Number of Floors", min_value=1, max_value=5, value=1)
+
+        # Living area first
+        sqft_living = st.slider(
+            "Living Area (sqft)", min_value=0, max_value=6000, value=2000
         )
-    )
-    st.text(cost[0])
-    # # Preprocess input data
-    # input_df = preprocess_input(
-    #     price,
-    #     area,
-    #     bedrooms,
-    #     bathrooms,
-    #     stories,
-    #     mainroad,
-    #     guestroom,
-    #     basement,
-    #     hotwaterheating,
-    #     airconditioning,
-    #     parking,
-    #     prefarea,
-    #     furnishingstatus,
-    # )
 
-    # # Make prediction
-    # prediction = model.predict(input_df)
+        # Lot area slider that depends on living area
+        sqft_lot = st.slider(
+            "Lot Area (sqft)",
+            min_value=sqft_living,
+            max_value=200000,
+            value=max(10000, sqft_living),
+        )
 
-    # Display prediction
-    # st.write("---")
-    # st.write(f"Predicted price of the house: {prediction[0]:.2f}")
+        sqft_above = st.slider(
+            "Above Ground Area (sqft)", min_value=700, max_value=6000, value=1340
+        )
+
+        # Waterfront feature with radio buttons
+        waterfront = st.radio("Waterfront", options=["No", "Yes"])
+        waterfront = 1 if waterfront == "Yes" else 0
+
+        view = st.slider("View Rating", min_value=0, max_value=4, value=0)
+        condition = st.slider("Condition", min_value=1, max_value=5, value=3)
+        yr_built = st.slider("Year Built", min_value=1900, max_value=2014, value=1955)
+
+    # Button to make a prediction
+    if st.button("Predict House Price"):
+        # Calculate house age
+        house_age = 2014 - yr_built
+
+        # Inverse the number of bedrooms
+        inverted_bedrooms = 7 - bedrooms
+
+        # Prepare the feature array for prediction
+        features = [
+            [
+                inverted_bedrooms,
+                bathrooms,
+                sqft_living,
+                sqft_lot,
+                floors,
+                waterfront,
+                view,
+                condition,
+                sqft_above,
+                house_age,  # Use house age instead of yr_built
+            ]
+        ]
+
+        # Convert features to DataFrame
+        feature_names = [
+            "bedrooms",
+            "bathrooms",
+            "sqft_living",
+            "sqft_lot",
+            "floors",
+            "waterfront",
+            "view",
+            "condition",
+            "sqft_above",
+            "house_age",
+        ]
+        features_df = pd.DataFrame(features, columns=feature_names)
+
+        # Scale the features
+        features_scaled = scaler.transform(features_df)
+
+        # Make the prediction
+        predicted_price = loaded_model.predict(features_scaled)[0]
+
+        # Display the predicted house price with improved UI
+        st.markdown(
+            """
+            <div style="background-color: #80848c; padding: 20px; border-radius: 10px; text-align: center;">
+                <h2 style="color: #ffffff;">Predicted House Price</h2>
+                <p style="font-size: 24px; color: #0d6320;"><strong>${:,.2f}</strong></p>
+            </div>
+            """.format(
+                predicted_price
+            ),
+            unsafe_allow_html=True,
+        )
+
+
+if __name__ == "__main__":
+    main()
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown(
+            '<h6>Made with &nbsp<img src="https://streamlit.io/images/brand/streamlit-mark-color.png" alt="Streamlit logo" height="16">&nbsp by Ahmad, Nisya, Hendrick</h6>',
+            unsafe_allow_html=True,
+        )
